@@ -16,7 +16,7 @@ Version 1.0 | January 2026
 
 ## Abstract
 
-Pasifika Token (PASI) is a blockchain-based ERC-20 token designed to emancipate remittances for Pacific Islander communities and their global diaspora. By leveraging the Pasifika Data Chain i.e. our purpose built Proof-of-Authority (PoA) blockchain and a mirrored deployment on Arbitrum One, PASI reduces remittance costs from the traditional 5-15% to just 0.5%, while enabling near instant transfers across borders and global DEX accessibility.
+Pasifika Token (PASI) is a blockchain-based ERC-20 token designed to emancipate remittances for Pacific Islander communities and our global diaspora communities. By leveraging the Pasifika Data Chain i.e. our purpose built Proof-of-Authority (PoA) blockchain and a mirrored deployment on Arbitrum One, PASI reduces remittance costs from the traditional 5-15% to just 0.5%, while enabling near instant transfers across borders and global DEX accessibility.
 
 This whitepaper presents the technical architecture, tokenomics, governance model, and security framework of the Pasifika Token ecosystem, which has successfully completed a comprehensive security audit with all critical findings addressed.
 
