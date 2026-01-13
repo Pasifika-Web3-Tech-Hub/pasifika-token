@@ -14,7 +14,16 @@ bracket_spacing = true
 [rpc_endpoints]
 pasifika = "https://rpc.pasifika.xyz"
 localhost = "http://127.0.0.1:8545"
+# Public networks for DEX trading
+mainnet = "${ETH_RPC_URL}"
+sepolia = "${SEPOLIA_RPC_URL}"
+base = "${BASE_RPC_URL}"
+arbitrum = "${ARBITRUM_RPC_URL}"
+polygon = "${POLYGON_RPC_URL}"
 
-# Etherscan verification not available for Pasifika Data Chain
-# [etherscan]
-# pasifika = { key = "", chain = 999888 }
+[etherscan]
+mainnet = { key = "${ETHERSCAN_API_KEY}" }
+sepolia = { key = "${ETHERSCAN_API_KEY}" }
+base = { key = "${ETHERSCAN_API_KEY}", chain = 8453 }
+arbitrum = { key = "${ETHERSCAN_API_KEY}", chain = 42161 }
+polygon = { key = "${ETHERSCAN_API_KEY}", chain = 137 }
