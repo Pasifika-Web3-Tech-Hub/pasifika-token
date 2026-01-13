@@ -56,8 +56,13 @@ contract PasifikaTokenTest is Test {
 
     function test_Constructor_RevertExceedsMaxSupply() public {
         uint256 exceedingSupply = token.MAX_SUPPLY() + 1;
-        vm.expectRevert("Initial supply exceeds max supply");
+        vm.expectRevert(PasifikaToken.InitialSupplyExceedsMax.selector);
         new PasifikaToken(admin, exceedingSupply);
+    }
+
+    function test_Constructor_RevertZeroAdmin() public {
+        vm.expectRevert(PasifikaToken.InvalidAdmin.selector);
+        new PasifikaToken(address(0), INITIAL_SUPPLY);
     }
 
     function test_AdminHasAllRoles() public view {
@@ -118,13 +123,13 @@ contract PasifikaTokenTest is Test {
 
     function test_SendRemittance_RevertZeroAddress() public {
         vm.prank(admin);
-        vm.expectRevert("Cannot send to zero address");
+        vm.expectRevert(PasifikaToken.InvalidRecipient.selector);
         token.sendRemittance(address(0), 100, "US-TONGA");
     }
 
     function test_SendRemittance_RevertZeroAmount() public {
         vm.prank(admin);
-        vm.expectRevert("Amount must be greater than zero");
+        vm.expectRevert(PasifikaToken.InvalidAmount.selector);
         token.sendRemittance(user1, 0, "US-TONGA");
     }
 
@@ -150,7 +155,7 @@ contract PasifikaTokenTest is Test {
 
     function test_SetFeeBasisPoints_RevertTooHigh() public {
         vm.prank(admin);
-        vm.expectRevert("Fee too high");
+        vm.expectRevert(PasifikaToken.FeeTooHigh.selector);
         token.setFeeBasisPoints(501); // > 5%
     }
 
@@ -198,7 +203,7 @@ contract PasifikaTokenTest is Test {
         amounts[2] = 300;
         
         vm.prank(admin);
-        vm.expectRevert("Arrays length mismatch");
+        vm.expectRevert(PasifikaToken.ArrayLengthMismatch.selector);
         token.batchTransfer(recipients, amounts);
     }
 
@@ -224,7 +229,7 @@ contract PasifikaTokenTest is Test {
         uint256 remaining = token.MAX_SUPPLY() - token.totalSupply();
         
         vm.prank(admin);
-        vm.expectRevert("Would exceed max supply");
+        vm.expectRevert(PasifikaToken.WouldExceedMaxSupply.selector);
         token.mint(user1, remaining + 1);
     }
 
@@ -342,6 +347,7 @@ contract PasifikaTreasuryTest is Test {
     address public validator2 = address(3);
     address public validator3 = address(4);
     address public recipient = address(5);
+    address public user1 = address(6);
     
     uint256 constant INITIAL_SUPPLY = 100_000_000 * 10 ** 18;
 
@@ -376,10 +382,11 @@ contract PasifikaTreasuryTest is Test {
         
         assertEq(proposalId, 0);
         
-        (address r, uint256 amt, string memory desc, , , , bool executed) = treasury.getProposal(0);
+        (address r, uint256 amt, string memory desc, , , , uint256 valCount, bool executed) = treasury.getProposal(0);
         assertEq(r, recipient);
         assertEq(amt, 100 * 10 ** 18);
         assertEq(desc, "Validator reward Q1");
+        assertEq(valCount, 4); // admin + 3 validators
         assertFalse(executed);
     }
 
@@ -393,7 +400,7 @@ contract PasifikaTreasuryTest is Test {
         vm.prank(validator2);
         treasury.vote(0, true);
         
-        (, , , uint256 votesFor, uint256 votesAgainst, , ) = treasury.getProposal(0);
+        (, , , uint256 votesFor, uint256 votesAgainst, , , ) = treasury.getProposal(0);
         assertEq(votesFor, 2);
         assertEq(votesAgainst, 0);
     }
@@ -430,8 +437,74 @@ contract PasifikaTreasuryTest is Test {
         
         vm.warp(block.timestamp + 4 days);
         
-        vm.expectRevert("Proposal not approved");
+        vm.expectRevert(PasifikaTreasury.ProposalNotApproved.selector);
         treasury.executeDistribution(0);
+    }
+
+    // ============ Security Fix Tests ============
+
+    function test_ExecuteDistribution_RevertInsufficientBalance() public {
+        // Create two proposals that together exceed treasury balance
+        // Treasury has 1000 tokens initially
+        
+        vm.prank(validator1);
+        treasury.proposeDistribution(recipient, 600 * 10 ** 18, "First distribution");
+        
+        vm.prank(validator2);
+        treasury.proposeDistribution(user1, 600 * 10 ** 18, "Second distribution");
+        
+        // Vote yes on both proposals
+        vm.prank(validator1);
+        treasury.vote(0, true);
+        vm.prank(validator2);
+        treasury.vote(0, true);
+        vm.prank(validator3);
+        treasury.vote(0, true);
+        vm.prank(admin);
+        treasury.vote(0, true);
+        
+        vm.prank(validator1);
+        treasury.vote(1, true);
+        vm.prank(validator2);
+        treasury.vote(1, true);
+        vm.prank(validator3);
+        treasury.vote(1, true);
+        vm.prank(admin);
+        treasury.vote(1, true);
+        
+        vm.warp(block.timestamp + 4 days);
+        
+        // Execute first proposal - treasury now has 400 tokens
+        treasury.executeDistribution(0);
+        assertEq(token.balanceOf(recipient), 600 * 10 ** 18);
+        
+        // Second proposal should revert due to insufficient balance (needs 600, has 400)
+        vm.expectRevert(PasifikaTreasury.InsufficientTreasuryBalance.selector);
+        treasury.executeDistribution(1);
+    }
+
+    function test_QuorumUsesValidatorCountAtCreation() public {
+        // Create proposal with 4 validators
+        vm.prank(validator1);
+        treasury.proposeDistribution(recipient, 100 * 10 ** 18, "Test");
+        
+        // Get 3 votes (75% of 4 validators = passes 51% quorum)
+        vm.prank(validator1);
+        treasury.vote(0, true);
+        vm.prank(validator2);
+        treasury.vote(0, true);
+        vm.prank(validator3);
+        treasury.vote(0, true);
+        
+        // Remove validators after voting (shouldn't affect quorum)
+        vm.prank(admin);
+        treasury.removeValidator(validator3);
+        
+        vm.warp(block.timestamp + 4 days);
+        
+        // Should still execute because quorum uses count at creation (4)
+        treasury.executeDistribution(0);
+        assertEq(token.balanceOf(recipient), 100 * 10 ** 18);
     }
 
     function test_IsValidator() public view {

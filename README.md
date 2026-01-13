@@ -311,10 +311,30 @@ Supported corridor codes for tracking (examples):
 - Role based access control for sensitive operations
 - Pausable functionality for emergency response
 - Max supply cap prevents unlimited minting
+- Reentrancy protection on critical treasury functions
+- Custom errors for gas-efficient reverts
 
 ### Audit Status
 
-⚠️ **Not yet audited** - This token is in development phase. A security audit is recommended before mainnet deployment.
+✅ **Audited** - Security audit completed January 13, 2026
+
+| Severity | Found | Fixed |
+|----------|-------|-------|
+| Critical | 0 | - |
+| High | 2 | ✅ 2 |
+| Medium | 3 | ✅ 2 |
+| Low | 4 | ✅ 4 |
+| Informational | 5 | ✅ 4 |
+
+**Key Security Features Implemented:**
+- **[H-01] Fixed** - Treasury balance verification at execution time prevents race conditions
+- **[H-02] Fixed** - ReentrancyGuard protects treasury distributions
+- **[M-02] Fixed** - Validator count stored at proposal creation prevents quorum manipulation
+- **[L-01] Fixed** - Zero address validation in constructor
+- **[L-03] Fixed** - Voting period bounds (1-30 days)
+- **[I-05] Fixed** - Custom errors replace require strings for gas savings
+
+**Audit Report:** [2026-01-13-pasifika-token-audit-report.pdf](../codehawks-security-portfolio/2026-01-13-pasifika-token-audit-report.pdf)
 
 ## Development
 
@@ -328,7 +348,7 @@ pasifika-token/
 ├── script/
 │   └── Deploy.s.sol           # Deployment scripts
 ├── test/
-│   └── PasifikaToken.t.sol    # Unit tests (35 tests)
+│   └── PasifikaToken.t.sol    # Unit tests (38 tests)
 ├── lib/                        # Dependencies (forge-std, openzeppelin)
 ├── foundry.toml               # Foundry configuration
 ├── remappings.txt             # Import remappings
@@ -345,7 +365,7 @@ pasifika-token/
 ### Test Coverage
 
 ```bash
-# Run all 35 tests
+# Run all 38 tests
 forge test
 
 # With gas report

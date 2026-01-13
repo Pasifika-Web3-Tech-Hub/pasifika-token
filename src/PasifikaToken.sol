@@ -26,6 +26,17 @@ contract PasifikaToken is ERC20, ERC20Burnable, ERC20Pausable, AccessControl {
 
     uint256 public constant MAX_SUPPLY = 1_000_000_000 * 10 ** 18; // 1 billion tokens
     uint256 public constant MAX_FEE_BASIS_POINTS = 500; // Max 5% fee
+    uint256 public constant BASIS_POINTS_DENOMINATOR = 10000;
+    uint256 public constant MAX_BATCH_RECIPIENTS = 100;
+
+    error InvalidAdmin();
+    error InvalidRecipient();
+    error InvalidAmount();
+    error InitialSupplyExceedsMax();
+    error WouldExceedMaxSupply();
+    error FeeTooHigh();
+    error ArrayLengthMismatch();
+    error TooManyRecipients();
 
     address public treasury;
     uint256 public feeBasisPoints = 50; // 0.5% default fee (50 basis points)
@@ -37,6 +48,12 @@ contract PasifikaToken is ERC20, ERC20Burnable, ERC20Pausable, AccessControl {
         uint256 fee,
         string corridor,
         uint256 timestamp
+    );
+
+    event BatchTransfer(
+        address indexed from,
+        uint256 recipientCount,
+        uint256 totalAmount
     );
 
     event ValidatorAdded(address indexed validator, string organization);
@@ -53,7 +70,8 @@ contract PasifikaToken is ERC20, ERC20Burnable, ERC20Pausable, AccessControl {
         address defaultAdmin,
         uint256 initialSupply
     ) ERC20("Pasifika Token", "PASI") {
-        require(initialSupply <= MAX_SUPPLY, "Initial supply exceeds max supply");
+        if (defaultAdmin == address(0)) revert InvalidAdmin();
+        if (initialSupply > MAX_SUPPLY) revert InitialSupplyExceedsMax();
         
         _grantRole(DEFAULT_ADMIN_ROLE, defaultAdmin);
         _grantRole(PAUSER_ROLE, defaultAdmin);
@@ -76,8 +94,8 @@ contract PasifikaToken is ERC20, ERC20Burnable, ERC20Pausable, AccessControl {
         uint256 amount,
         string calldata corridor
     ) external whenNotPaused {
-        require(to != address(0), "Cannot send to zero address");
-        require(amount > 0, "Amount must be greater than zero");
+        if (to == address(0)) revert InvalidRecipient();
+        if (amount == 0) revert InvalidAmount();
         
         uint256 fee = calculateFee(amount);
         uint256 netAmount = amount - fee;
@@ -99,7 +117,7 @@ contract PasifikaToken is ERC20, ERC20Burnable, ERC20Pausable, AccessControl {
         if (treasury == address(0) || feeBasisPoints == 0) {
             return 0;
         }
-        return (amount * feeBasisPoints) / 10000;
+        return (amount * feeBasisPoints) / BASIS_POINTS_DENOMINATOR;
     }
 
     /**
@@ -117,7 +135,7 @@ contract PasifikaToken is ERC20, ERC20Burnable, ERC20Pausable, AccessControl {
      * @param newFeeBasisPoints New fee in basis points
      */
     function setFeeBasisPoints(uint256 newFeeBasisPoints) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(newFeeBasisPoints <= MAX_FEE_BASIS_POINTS, "Fee too high");
+        if (newFeeBasisPoints > MAX_FEE_BASIS_POINTS) revert FeeTooHigh();
         uint256 oldFee = feeBasisPoints;
         feeBasisPoints = newFeeBasisPoints;
         emit FeeUpdated(oldFee, newFeeBasisPoints);
@@ -132,13 +150,20 @@ contract PasifikaToken is ERC20, ERC20Burnable, ERC20Pausable, AccessControl {
         address[] calldata recipients,
         uint256[] calldata amounts
     ) external whenNotPaused {
-        require(recipients.length == amounts.length, "Arrays length mismatch");
-        require(recipients.length <= 100, "Too many recipients");
+        if (recipients.length != amounts.length) revert ArrayLengthMismatch();
+        if (recipients.length > MAX_BATCH_RECIPIENTS) revert TooManyRecipients();
 
-        for (uint256 i = 0; i < recipients.length; i++) {
-            require(recipients[i] != address(0), "Cannot send to zero address");
+        uint256 len = recipients.length;
+        uint256 totalAmount = 0;
+        
+        for (uint256 i = 0; i < len;) {
+            if (recipients[i] == address(0)) revert InvalidRecipient();
+            totalAmount += amounts[i];
             _transfer(msg.sender, recipients[i], amounts[i]);
+            unchecked { ++i; }
         }
+        
+        emit BatchTransfer(msg.sender, len, totalAmount);
     }
 
     /**
@@ -147,7 +172,7 @@ contract PasifikaToken is ERC20, ERC20Burnable, ERC20Pausable, AccessControl {
      * @param amount Amount of tokens to mint
      */
     function mint(address to, uint256 amount) external onlyRole(MINTER_ROLE) {
-        require(totalSupply() + amount <= MAX_SUPPLY, "Would exceed max supply");
+        if (totalSupply() + amount > MAX_SUPPLY) revert WouldExceedMaxSupply();
         _mint(to, amount);
     }
 

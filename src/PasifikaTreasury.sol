@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import "@openzeppelin/contracts/access/extensions/AccessControlEnumerable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * @title PasifikaTreasury
@@ -11,12 +12,29 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
  * @notice Treasury contract for collecting fees and distributing to validators via governance
  * @dev Validators can propose and vote on distributions from the treasury
  */
-contract PasifikaTreasury is AccessControlEnumerable {
+contract PasifikaTreasury is AccessControlEnumerable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     bytes32 public constant VALIDATOR_ROLE = keccak256("VALIDATOR_ROLE");
 
+    uint256 public constant MIN_VOTING_PERIOD = 1 days;
+    uint256 public constant MAX_VOTING_PERIOD = 30 days;
+    uint256 public constant PERCENTAGE_DENOMINATOR = 100;
+
     IERC20 public immutable token;
+
+    error InvalidRecipient();
+    error InvalidAmount();
+    error InsufficientTreasuryBalance();
+    error VotingPeriodEnded();
+    error AlreadyVoted();
+    error AlreadyExecuted();
+    error VotingPeriodNotEnded();
+    error ProposalNotApproved();
+    error QuorumNotReached();
+    error InvalidVotingPeriod();
+    error InvalidQuorum();
+    error InvalidValidator();
 
     struct Distribution {
         address recipient;
@@ -25,6 +43,7 @@ contract PasifikaTreasury is AccessControlEnumerable {
         uint256 votesFor;
         uint256 votesAgainst;
         uint256 deadline;
+        uint256 validatorCountAtCreation;
         bool executed;
         mapping(address => bool) hasVoted;
     }
@@ -33,14 +52,15 @@ contract PasifikaTreasury is AccessControlEnumerable {
     mapping(uint256 => Distribution) public distributions;
     
     uint256 public votingPeriod = 3 days;
-    uint256 public quorumPercent = 51; // 51% of validators must vote for
+    uint256 public quorumPercent = 51;
 
     event DistributionProposed(
         uint256 indexed proposalId,
         address indexed recipient,
         uint256 amount,
         string description,
-        uint256 deadline
+        uint256 deadline,
+        uint256 validatorCount
     );
 
     event Voted(
@@ -57,6 +77,8 @@ contract PasifikaTreasury is AccessControlEnumerable {
 
     event ValidatorAdded(address indexed validator);
     event ValidatorRemoved(address indexed validator);
+    event VotingPeriodUpdated(uint256 oldPeriod, uint256 newPeriod);
+    event QuorumUpdated(uint256 oldQuorum, uint256 newQuorum);
 
     /**
      * @notice Initialize the treasury
@@ -85,19 +107,22 @@ contract PasifikaTreasury is AccessControlEnumerable {
         uint256 amount,
         string calldata description
     ) external onlyRole(VALIDATOR_ROLE) returns (uint256 proposalId) {
-        require(recipient != address(0), "Invalid recipient");
-        require(amount > 0, "Amount must be greater than zero");
-        require(token.balanceOf(address(this)) >= amount, "Insufficient treasury balance");
+        if (recipient == address(0)) revert InvalidRecipient();
+        if (amount == 0) revert InvalidAmount();
+        if (token.balanceOf(address(this)) < amount) revert InsufficientTreasuryBalance();
 
+        uint256 currentValidatorCount = getValidatorCount();
+        
         proposalId = proposalCount++;
         Distribution storage d = distributions[proposalId];
         d.recipient = recipient;
         d.amount = amount;
         d.description = description;
         d.deadline = block.timestamp + votingPeriod;
+        d.validatorCountAtCreation = currentValidatorCount;
         d.executed = false;
 
-        emit DistributionProposed(proposalId, recipient, amount, description, d.deadline);
+        emit DistributionProposed(proposalId, recipient, amount, description, d.deadline, currentValidatorCount);
     }
 
     /**
@@ -108,9 +133,9 @@ contract PasifikaTreasury is AccessControlEnumerable {
     function vote(uint256 proposalId, bool support) external onlyRole(VALIDATOR_ROLE) {
         Distribution storage d = distributions[proposalId];
         
-        require(block.timestamp < d.deadline, "Voting period ended");
-        require(!d.hasVoted[msg.sender], "Already voted");
-        require(!d.executed, "Already executed");
+        if (block.timestamp >= d.deadline) revert VotingPeriodEnded();
+        if (d.hasVoted[msg.sender]) revert AlreadyVoted();
+        if (d.executed) revert AlreadyExecuted();
 
         d.hasVoted[msg.sender] = true;
 
@@ -127,19 +152,19 @@ contract PasifikaTreasury is AccessControlEnumerable {
      * @notice Execute an approved distribution
      * @param proposalId ID of the proposal to execute
      */
-    function executeDistribution(uint256 proposalId) external {
+    function executeDistribution(uint256 proposalId) external nonReentrant {
         Distribution storage d = distributions[proposalId];
         
-        require(block.timestamp >= d.deadline, "Voting period not ended");
-        require(!d.executed, "Already executed");
-        require(d.votesFor > d.votesAgainst, "Proposal not approved");
+        if (block.timestamp < d.deadline) revert VotingPeriodNotEnded();
+        if (d.executed) revert AlreadyExecuted();
+        if (d.votesFor <= d.votesAgainst) revert ProposalNotApproved();
         
         uint256 totalVotes = d.votesFor + d.votesAgainst;
-        uint256 validatorCount = getValidatorCount();
-        require(
-            totalVotes * 100 >= validatorCount * quorumPercent,
-            "Quorum not reached"
-        );
+        if (totalVotes * PERCENTAGE_DENOMINATOR < d.validatorCountAtCreation * quorumPercent) {
+            revert QuorumNotReached();
+        }
+
+        if (token.balanceOf(address(this)) < d.amount) revert InsufficientTreasuryBalance();
 
         d.executed = true;
         token.safeTransfer(d.recipient, d.amount);
@@ -170,8 +195,10 @@ contract PasifikaTreasury is AccessControlEnumerable {
      * @param newPeriod New voting period in seconds
      */
     function setVotingPeriod(uint256 newPeriod) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(newPeriod >= 1 days, "Voting period too short");
+        if (newPeriod < MIN_VOTING_PERIOD || newPeriod > MAX_VOTING_PERIOD) revert InvalidVotingPeriod();
+        uint256 oldPeriod = votingPeriod;
         votingPeriod = newPeriod;
+        emit VotingPeriodUpdated(oldPeriod, newPeriod);
     }
 
     /**
@@ -179,8 +206,10 @@ contract PasifikaTreasury is AccessControlEnumerable {
      * @param newQuorum New quorum percentage (1-100)
      */
     function setQuorumPercent(uint256 newQuorum) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(newQuorum > 0 && newQuorum <= 100, "Invalid quorum");
+        if (newQuorum == 0 || newQuorum > PERCENTAGE_DENOMINATOR) revert InvalidQuorum();
+        uint256 oldQuorum = quorumPercent;
         quorumPercent = newQuorum;
+        emit QuorumUpdated(oldQuorum, newQuorum);
     }
 
     /**
@@ -204,6 +233,14 @@ contract PasifikaTreasury is AccessControlEnumerable {
     /**
      * @notice Get proposal details
      * @param proposalId ID of the proposal
+     * @return recipient Address to receive distribution
+     * @return amount Amount of tokens
+     * @return description Proposal description
+     * @return votesFor Number of votes in favor
+     * @return votesAgainst Number of votes against
+     * @return deadline Voting deadline timestamp
+     * @return validatorCountAtCreation Validator count when proposal was created
+     * @return executed Whether proposal has been executed
      */
     function getProposal(uint256 proposalId) external view returns (
         address recipient,
@@ -212,6 +249,7 @@ contract PasifikaTreasury is AccessControlEnumerable {
         uint256 votesFor,
         uint256 votesAgainst,
         uint256 deadline,
+        uint256 validatorCountAtCreation,
         bool executed
     ) {
         Distribution storage d = distributions[proposalId];
@@ -222,6 +260,7 @@ contract PasifikaTreasury is AccessControlEnumerable {
             d.votesFor,
             d.votesAgainst,
             d.deadline,
+            d.validatorCountAtCreation,
             d.executed
         );
     }
