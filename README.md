@@ -67,87 +67,6 @@ Pasifika Token (PASI) is an ERC-20 token designed specifically for Pacific Islan
 | `PAUSER_ROLE` | Can pause/unpause transfers |
 | `VALIDATOR_ROLE` | Trusted community validators |
 
-## Installation
-
-### Prerequisites
-
-- [Foundry](https://getfoundry.sh/) installed
-- Git
-
-### Setup
-
-```bash
-# Clone the repository
-cd /home/user/Documents/pasifika-web3-tech-hub/pasifika-token
-
-# Install dependencies
-forge install OpenZeppelin/openzeppelin-contracts
-forge install foundry-rs/forge-std
-
-# Build
-forge build
-
-# Run tests
-forge test
-```
-
-## Usage
-
-### Build
-
-```bash
-forge build
-```
-
-### Test
-
-```bash
-# Run all tests
-forge test
-
-# Run with verbosity
-forge test -vvv
-
-# Run specific test
-forge test --match-test test_SendRemittance
-
-# Gas report
-forge test --gas-report
-```
-
-### Deploy to Pasifika Data Chain
-
-The Pasifika Data Chain is live at **https://rpc.pasifika.xyz**
-
-**1. Create a keystore for your deployer wallet:**
-```bash
-cast wallet import pasifika-deployer --interactive
-```
-You will be prompted to enter your private key and a password to encrypt it.
-
-**2. Deploy the token:**
-```bash
-forge script script/Deploy.s.sol --rpc-url https://rpc.pasifika.xyz --account pasifika-deployer --broadcast
-```
-You will be prompted for your keystore password.
-
-**3. (Optional) List your keystores:**
-```bash
-cast wallet list
-```
-
-### Interact with Deployed Token
-
-```bash
-# Check balance
-cast call <TOKEN_ADDRESS> "balanceOf(address)" <WALLET_ADDRESS> --rpc-url https://rpc.pasifika.xyz
-
-# Transfer tokens (using keystore)
-cast send <TOKEN_ADDRESS> "transfer(address,uint256)" <TO_ADDRESS> <AMOUNT> --account pasifika-deployer --rpc-url https://rpc.pasifika.xyz
-
-# Send remittance with corridor tracking (using keystore)
-cast send <TOKEN_ADDRESS> "sendRemittance(address,uint256,string)" <TO_ADDRESS> <AMOUNT> "US-TONGA" --account pasifika-deployer --rpc-url https://rpc.pasifika.xyz
-```
 
 ## Contract API
 
@@ -359,22 +278,6 @@ pasifika-token/
 └── README.md
 ```
 
-### Adding a New Feature
-
-1. Implement in `src/PasifikaToken.sol` or `src/PasifikaTreasury.sol`
-2. Add tests in `test/PasifikaToken.t.sol`
-3. Run `forge test` to verify
-4. Update deployment script if needed
-
-### Test Coverage
-
-```bash
-# Run all 38 tests
-forge test
-
-# With gas report
-forge test --gas-report
-```
 
 ## License
 
