@@ -12,12 +12,23 @@
 
 ## Overview
 
-Pasifika Token (PASI) is an ERC-20 token designed specifically for Pacific Islander communities and their diaspora. Built for deployment on the **Pasifika Data Chain** (Chain ID: 999888), it enables:
+Pasifika Token (PASI) is an ERC-20 utility token designed specifically for Pacific Islander communities and their diaspora. PASI runs natively on the **Pasifika Data Chain** (Chain ID: 999888) for zero-gas community transfers and is mirrored on **Arbitrum One** (Chain ID: 42161) to provide public DEX liquidity and global accessibility.
 
 - **Low cost remittances** - Only 0.5% fee vs 5-15% traditional services
 - **Community governance** - Role based access control with validator organizations
 - **Financial inclusion** - Simple token transfers without traditional banking barriers
+- **Public market access** - PASI/USDC pool live on Arbitrum Uniswap v2
 - **Global cross border portability** - Works across US, New Zealand, Australia, Pacific Islands, EU, Russia, Asia, Africa, Arctic, Antarctica, and Middle East
+
+## Latest Developments (January 2026)
+
+- ✅ **Arbitrum mainnet deployment:** `0xf5dd879f1d6249D651E326777585449E45A5E418`
+- ✅ **Treasury live on Arbitrum:** `0xd9588c83a4C42c4630694765f11A1fB012a60aCc`
+- ✅ **Contracts verified on Sourcify** (PasifikaToken + PasifikaTreasury)
+- ✅ **Initial PASI/USDC Uniswap v2 liquidity** added on Arbitrum
+- 🔄 **Arbiscan metadata submission** (logo + description) in progress
+
+> PASI continues to operate on the Pasifika Data Chain for zero-gas community transfers, while Arbitrum provides public-market liquidity and DEX access.
 
 ## Token Specifications
 
@@ -29,7 +40,10 @@ Pasifika Token (PASI) is an ERC-20 token designed specifically for Pacific Islan
 | **Max Supply** | 1,000,000,000 (1 billion) |
 | **Initial Supply** | 100,000,000 (100 million) |
 | **Standard** | ERC-20 |
-| **Network** | Pasifika Data Chain (999888) |
+| **Networks** | Pasifika Data Chain (Chain ID 999888) <br> Arbitrum One (Chain ID 42161) |
+| **Token Address (Arbitrum)** | `0xf5dd879f1d6249D651E326777585449E45A5E418` |
+| **Treasury Address (Arbitrum)** | `0xd9588c83a4C42c4630694765f11A1fB012a60aCc` |
+| **Uniswap v2 Pool** | PASI / USDC (Arbitrum) |
 | **Remittance Fee** | 0.5% (configurable, max 5%) |
 
 ## Features
@@ -66,7 +80,6 @@ Pasifika Token (PASI) is an ERC-20 token designed specifically for Pacific Islan
 | `MINTER_ROLE` | Can mint new tokens (up to max supply) |
 | `PAUSER_ROLE` | Can pause/unpause transfers |
 | `VALIDATOR_ROLE` | Trusted community validators |
-
 
 ## Contract API
 
@@ -277,7 +290,6 @@ pasifika-token/
 ├── remappings.txt             # Import remappings
 └── README.md
 ```
-
 
 ## License
 
