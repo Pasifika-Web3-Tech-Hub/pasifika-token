@@ -297,8 +297,8 @@ MIT License - see [LICENSE](LICENSE)
 
 ## Links
 
-- **Pasifika Data Chain**: [pasifika-poa-chain](../pasifika-poa-chain/)
-- **Whitepaper**: [WHITEPAPER.md](./docs/WHITEPAPER.md)
+- **Pasifika Data Chain Repo**: [Pasifika Data Chain](https://github.com/EdwinLiavaa/pasifika-poa-chain)
+- **Whitepaper**: [WHITEPAPER](./docs/WHITEPAPER.md)
 - **Website**: https://pasifika.xyz
 - **Contact**: edwin@pasifika.xyz
 
