@@ -16,7 +16,7 @@ Version 1.0 | January 2026
 
 ## Abstract
 
-Pasifika Token (PASI) is a blockchain-based ERC-20 token designed to revolutionize remittances for Pacific Islander communities and their global diaspora. By leveraging the Pasifika Data Chain i.e. a purpose built Proof-of-Authority (PoA) blockchain, PASI reduces remittance costs from the traditional 5-15% to just 0.5%, while enabling near instant transfers across borders.
+Pasifika Token (PASI) is a blockchain-based ERC-20 token designed to emancipate remittances for Pacific Islander communities and their global diaspora. By leveraging the Pasifika Data Chain i.e. our purpose built Proof-of-Authority (PoA) blockchain and a mirrored deployment on Arbitrum One, PASI reduces remittance costs from the traditional 5-15% to just 0.5%, while enabling near instant transfers across borders and global DEX accessibility.
 
 This whitepaper presents the technical architecture, tokenomics, governance model, and security framework of the Pasifika Token ecosystem, which has successfully completed a comprehensive security audit with all critical findings addressed.
 
@@ -93,15 +93,16 @@ At scale, this represents millions of dollars retained within Pacific communitie
 
 ### 3.1 Pasifika Token (PASI)
 
-PASI is an ERC-20 compliant token deployed on the Pasifika Data Chain, purpose-built for:
+PASI is an ERC-20 compliant token deployed on the Pasifika Data Chain and mirrored on Arbitrum One, purpose-built for:
 
 | Feature | Benefit |
 |---------|---------|
 | **0.5% Transaction Fee** | 90%+ savings vs traditional remittances |
-| **< 5 Minute Transfers** | Near instant settlement |
+| **< 5 Minute Transfers** | Near instant settlement on both chains |
 | **Mobile First Design** | No bank account required |
 | **Community Governance** | Validators are trusted Pacific organizations |
 | **Corridor Tracking** | Transparent remittance analytics |
+| **Public Liquidity** | PASI/USDC Uniswap v2 pool on Arbitrum enables open-market price discovery |
 
 ### 3.2 Pasifika Data Chain
 
@@ -112,6 +113,27 @@ A Proof-of-Authority (PoA) blockchain optimized for Pacific community use:
 - **Block Time**: ~5 seconds
 - **Gas Fees**: Zero (subsidized by validators)
 - **RPC Endpoint**: https://rpc.pasifika.xyz
+
+### 3.3 Arbitrum One Deployment
+
+To provide public DEX liquidity, institutional integrations, and transparent price discovery, PASI is also deployed on Arbitrum One:
+
+- **Chain ID**: 42161
+- **Token Address**: `0xf5dd879f1d6249D651E326777585449E45A5E418`
+- **Treasury Address**: `0xd9588c83a4C42c4630694765f11A1fB012a60aCc`
+- **Verification**: Both contracts verified via Sourcify
+- **DEX Liquidity**: PASI/USDC Uniswap v2 pool live with inaugural liquidity at $0.05/PASI (20 PASI = 1 USDC)
+
+### 3.4 Public Deployment Status (January 2026)
+
+| Component | Status |
+|-----------|--------|
+| PasifikaToken.sol | ✅ Deployed on Pasifika Data Chain + Arbitrum One |
+| PasifikaTreasury.sol | ✅ Active on Arbitrum and linked to token |
+| Sourcify Verification | ✅ Token & Treasury verified |
+| Arbiscan Metadata | 🔄 Logo + description submission in progress |
+| Liquidity | ✅ PASI/USDC Uniswap v2 (Arbitrum) |
+| Community Chain | ✅ Zero-gas transfers via Pasifika Data Chain validators |
 
 ### 3.3 Core Components
 
@@ -142,7 +164,7 @@ A Proof-of-Authority (PoA) blockchain optimized for Pacific community use:
 
 #### PasifikaToken.sol
 
-The core ERC-20 token contract with remittance specific features:
+The core ERC-20 token contract with remittance specific features and dual-network support:
 
 ```solidity
 // Key Functions
@@ -177,7 +199,16 @@ function executeDistribution(uint256 proposalId) external;
 - 3-day voting period
 - Reentrancy protection
 
-### 4.2 Role Based Access Control
+### 4.2 Cross-Chain Architecture
+
+PASI uses a dual-deployment model:
+
+1. **Pasifika Data Chain** – Primary environment for validator-governed remittances, zero-gas transfers, and corridor analytics.
+2. **Arbitrum One** – Public network for liquidity, integrations, and on/off ramps. Treasury linkage mirrors on-chain fee collection, and the same admin wallet governs both deployments.
+
+A future bridge module is planned to allow seamless migration of liquidity/minted supply between chains while respecting the MAX_SUPPLY constraint.
+
+### 4.3 Role Based Access Control
 
 | Role | Permissions | Holders |
 |------|-------------|---------|
@@ -209,7 +240,7 @@ function executeDistribution(uint256 proposalId) external;
 | **Initial Supply** | 100,000,000 (100 million) |
 | **Standard** | ERC-20 |
 
-### 5.2 Token Distribution
+### 5.2 Token Distribution & Deployment Addresses
 
 ```
 ┌────────────────────────────────────────────────┐
@@ -239,11 +270,13 @@ Fees collected in the Treasury are distributed via validator governance:
 - **Emergency Reserve**: Security and stability fund
 - **Ecosystem Growth**: Merchant onboarding, partnerships
 
-### 5.5 Supply Mechanics
+### 5.5 Supply Mechanics & Public Liquidity
 
 - **Minting**: Controlled by MINTER_ROLE, capped at MAX_SUPPLY
 - **Burning**: Any holder can burn their tokens
 - **No Inflation**: Fixed maximum supply of 1 billion tokens
+- **Liquidity Launch**: First PASI/USDC pool seeded on Uniswap v2 (Arbitrum) to support remittance corridors
+- **Price Discovery**: Initial reference price set to 20 PASI = 1 USDC ($0.05), adjustable as market matures
 
 ---
 
@@ -338,8 +371,8 @@ Pasifika Token employs a **Validator Based Governance** model where trusted comm
 | Step | Traditional | Pasifika Token |
 |------|-------------|----------------|
 | 1 | Visit Western Union | Open mobile wallet |
-| 2 | Pay $100 + $10 fee | Send $100 (0.5% fee) |
-| 3 | Wait 2-3 days | Instant transfer |
+| 2 | Pay $100 + $10 fee | Send $100 (0.5% fee) via Pasifika Data Chain |
+| 3 | Wait 2-3 days | Instant settlement; optional swap on Arbitrum for USDC |
 | 4 | Family receives ~$85 | Family receives ~$99.50 |
 | **Total Cost** | **$15+ (15%)** | **$0.50 (0.5%)** |
 
@@ -377,6 +410,7 @@ Pasifika Token employs a **Validator Based Governance** model where trusted comm
 - ✅ Smart contract development
 - ✅ Security audit and remediation
 - ✅ Pasifika Data Chain deployment
+- ✅ Arbitrum One deployment + Uniswap liquidity
 - ✅ Core documentation
 
 ### Phase 2: Pilot (Q1-Q2 2026)
@@ -384,18 +418,20 @@ Pasifika Token employs a **Validator Based Governance** model where trusted comm
 - [ ] Onboard 3-5 validator organizations
 - [ ] 100-500 beta users in US-Tonga corridor
 - [ ] Establish first cash on/off ramps
+- [ ] Finalize Arbiscan metadata + explorer integrations
 
 ### Phase 3: Expansion (Q3-Q4 2026)
 - [ ] Scale to 5,000+ active users
 - [ ] Multi-corridor support (NZ, AU)
 - [ ] Merchant onboarding program
 - [ ] Advanced governance features
+- [ ] Automated bridge between Pasifika Data Chain and Arbitrum
 
 ### Phase 4: Ecosystem (2027+)
 - [ ] 50,000+ active users
 - [ ] Full Pacific region coverage
 - [ ] DeFi integrations (lending, savings)
-- [ ] Cross-chain bridges
+- [ ] Cross-chain bridges + L2 remittance rails
 
 ---
 
@@ -483,7 +519,7 @@ Success requires balancing technological capability with community needs, legal 
 
 **Website**: https://pasifika.xyz  
 **Email**: edwin@pasifika.xyz  
-**GitHub**: https://github.com/EdwinLiavaa/pasifika-token
+**GitHub**: https://github.com/Pasifika-Web3-Tech-Hub/pasifika-token
 
 ---
 
