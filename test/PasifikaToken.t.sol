@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.24;
 
 import "forge-std/Test.sol";
 import "../src/PasifikaToken.sol";
+import "../src/PasifikaTreasury.sol";
 
 contract PasifikaTokenTest is Test {
     PasifikaToken public token;
+    PasifikaTreasury public treasury;
     
     address public admin = address(1);
     address public user1 = address(2);
@@ -18,16 +20,22 @@ contract PasifikaTokenTest is Test {
         address indexed from,
         address indexed to,
         uint256 amount,
+        uint256 fee,
         string corridor,
         uint256 timestamp
     );
 
     event ValidatorAdded(address indexed validator, string organization);
     event ValidatorRemoved(address indexed validator);
+    event TreasuryUpdated(address indexed oldTreasury, address indexed newTreasury);
+    event FeeUpdated(uint256 oldFee, uint256 newFee);
 
     function setUp() public {
-        vm.prank(admin);
+        vm.startPrank(admin);
         token = new PasifikaToken(admin, INITIAL_SUPPLY);
+        treasury = new PasifikaTreasury(address(token), admin);
+        token.setTreasury(address(treasury));
+        vm.stopPrank();
     }
 
     // ============ Constructor Tests ============
@@ -73,21 +81,39 @@ contract PasifikaTokenTest is Test {
 
     // ============ Remittance Tests ============
 
-    function test_SendRemittance() public {
-        uint256 amount = 500 * 10 ** 18;
+    function test_SendRemittance_WithFee() public {
+        uint256 amount = 1000 * 10 ** 18;
         string memory corridor = "US-TONGA";
         
         vm.prank(admin);
         token.transfer(user1, amount);
         
-        vm.expectEmit(true, true, false, true);
-        emit RemittanceSent(user1, user2, amount, corridor, block.timestamp);
+        uint256 expectedFee = token.calculateFee(amount); // 0.5% = 5 tokens
+        uint256 expectedNet = amount - expectedFee;
         
         vm.prank(user1);
         token.sendRemittance(user2, amount, corridor);
         
-        assertEq(token.balanceOf(user2), amount);
+        assertEq(token.balanceOf(user2), expectedNet);
+        assertEq(token.balanceOf(address(treasury)), expectedFee);
         assertEq(token.balanceOf(user1), 0);
+    }
+
+    function test_SendRemittance_NoFeeWithoutTreasury() public {
+        // Deploy token without treasury
+        vm.prank(admin);
+        PasifikaToken tokenNoTreasury = new PasifikaToken(admin, INITIAL_SUPPLY);
+        
+        uint256 amount = 1000 * 10 ** 18;
+        
+        vm.prank(admin);
+        tokenNoTreasury.transfer(user1, amount);
+        
+        vm.prank(user1);
+        tokenNoTreasury.sendRemittance(user2, amount, "US-TONGA");
+        
+        // No fee deducted when treasury is not set
+        assertEq(tokenNoTreasury.balanceOf(user2), amount);
     }
 
     function test_SendRemittance_RevertZeroAddress() public {
@@ -100,6 +126,44 @@ contract PasifikaTokenTest is Test {
         vm.prank(admin);
         vm.expectRevert("Amount must be greater than zero");
         token.sendRemittance(user1, 0, "US-TONGA");
+    }
+
+    // ============ Fee Tests ============
+
+    function test_CalculateFee() public view {
+        uint256 amount = 1000 * 10 ** 18;
+        uint256 fee = token.calculateFee(amount);
+        // 0.5% fee = 5 tokens
+        assertEq(fee, 5 * 10 ** 18);
+    }
+
+    function test_SetFeeBasisPoints() public {
+        vm.prank(admin);
+        token.setFeeBasisPoints(100); // 1%
+        
+        assertEq(token.feeBasisPoints(), 100);
+        
+        uint256 amount = 1000 * 10 ** 18;
+        uint256 fee = token.calculateFee(amount);
+        assertEq(fee, 10 * 10 ** 18); // 1% = 10 tokens
+    }
+
+    function test_SetFeeBasisPoints_RevertTooHigh() public {
+        vm.prank(admin);
+        vm.expectRevert("Fee too high");
+        token.setFeeBasisPoints(501); // > 5%
+    }
+
+    function test_SetTreasury() public {
+        address newTreasury = address(0x999);
+        
+        vm.expectEmit(true, true, false, false);
+        emit TreasuryUpdated(address(treasury), newTreasury);
+        
+        vm.prank(admin);
+        token.setTreasury(newTreasury);
+        
+        assertEq(token.treasury(), newTreasury);
     }
 
     // ============ Batch Transfer Tests ============
@@ -258,9 +322,126 @@ contract PasifikaTokenTest is Test {
         vm.prank(admin);
         token.transfer(user1, amount);
         
+        uint256 expectedFee = token.calculateFee(amount);
+        uint256 expectedNet = amount - expectedFee;
+        
         vm.prank(user1);
         token.sendRemittance(user2, amount, corridor);
         
-        assertEq(token.balanceOf(user2), amount);
+        assertEq(token.balanceOf(user2), expectedNet);
+        assertEq(token.balanceOf(address(treasury)), expectedFee);
+    }
+}
+
+contract PasifikaTreasuryTest is Test {
+    PasifikaToken public token;
+    PasifikaTreasury public treasury;
+    
+    address public admin = address(1);
+    address public validator1 = address(2);
+    address public validator2 = address(3);
+    address public validator3 = address(4);
+    address public recipient = address(5);
+    
+    uint256 constant INITIAL_SUPPLY = 100_000_000 * 10 ** 18;
+
+    function setUp() public {
+        vm.startPrank(admin);
+        token = new PasifikaToken(admin, INITIAL_SUPPLY);
+        treasury = new PasifikaTreasury(address(token), admin);
+        token.setTreasury(address(treasury));
+        
+        // Add validators
+        treasury.addValidator(validator1);
+        treasury.addValidator(validator2);
+        treasury.addValidator(validator3);
+        vm.stopPrank();
+        
+        // Fund treasury with some tokens
+        vm.prank(admin);
+        token.transfer(address(treasury), 1000 * 10 ** 18);
+    }
+
+    function test_TreasuryBalance() public view {
+        assertEq(treasury.treasuryBalance(), 1000 * 10 ** 18);
+    }
+
+    function test_ProposeDistribution() public {
+        vm.prank(validator1);
+        uint256 proposalId = treasury.proposeDistribution(
+            recipient,
+            100 * 10 ** 18,
+            "Validator reward Q1"
+        );
+        
+        assertEq(proposalId, 0);
+        
+        (address r, uint256 amt, string memory desc, , , , bool executed) = treasury.getProposal(0);
+        assertEq(r, recipient);
+        assertEq(amt, 100 * 10 ** 18);
+        assertEq(desc, "Validator reward Q1");
+        assertFalse(executed);
+    }
+
+    function test_VoteOnProposal() public {
+        vm.prank(validator1);
+        treasury.proposeDistribution(recipient, 100 * 10 ** 18, "Test");
+        
+        vm.prank(validator1);
+        treasury.vote(0, true);
+        
+        vm.prank(validator2);
+        treasury.vote(0, true);
+        
+        (, , , uint256 votesFor, uint256 votesAgainst, , ) = treasury.getProposal(0);
+        assertEq(votesFor, 2);
+        assertEq(votesAgainst, 0);
+    }
+
+    function test_ExecuteDistribution() public {
+        vm.prank(validator1);
+        treasury.proposeDistribution(recipient, 100 * 10 ** 18, "Test");
+        
+        // All validators vote yes
+        vm.prank(validator1);
+        treasury.vote(0, true);
+        vm.prank(validator2);
+        treasury.vote(0, true);
+        vm.prank(validator3);
+        treasury.vote(0, true);
+        
+        // Fast forward past voting period
+        vm.warp(block.timestamp + 4 days);
+        
+        treasury.executeDistribution(0);
+        
+        assertEq(token.balanceOf(recipient), 100 * 10 ** 18);
+    }
+
+    function test_ExecuteDistribution_RevertNotApproved() public {
+        vm.prank(validator1);
+        treasury.proposeDistribution(recipient, 100 * 10 ** 18, "Test");
+        
+        // Majority votes no
+        vm.prank(validator1);
+        treasury.vote(0, false);
+        vm.prank(validator2);
+        treasury.vote(0, false);
+        
+        vm.warp(block.timestamp + 4 days);
+        
+        vm.expectRevert("Proposal not approved");
+        treasury.executeDistribution(0);
+    }
+
+    function test_IsValidator() public view {
+        assertTrue(treasury.isValidator(validator1));
+        assertTrue(treasury.isValidator(admin));
+        assertFalse(treasury.isValidator(recipient));
+    }
+
+    function test_GetValidatorCount() public view {
+        // admin + 3 validators = 4
+        assertEq(treasury.getValidatorCount(), 4);
     }
 }

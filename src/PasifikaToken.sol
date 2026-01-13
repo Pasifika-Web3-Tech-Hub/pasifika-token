@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
@@ -25,17 +25,24 @@ contract PasifikaToken is ERC20, ERC20Burnable, ERC20Pausable, AccessControl {
     bytes32 public constant VALIDATOR_ROLE = keccak256("VALIDATOR_ROLE");
 
     uint256 public constant MAX_SUPPLY = 1_000_000_000 * 10 ** 18; // 1 billion tokens
+    uint256 public constant MAX_FEE_BASIS_POINTS = 500; // Max 5% fee
+
+    address public treasury;
+    uint256 public feeBasisPoints = 50; // 0.5% default fee (50 basis points)
 
     event RemittanceSent(
         address indexed from,
         address indexed to,
         uint256 amount,
+        uint256 fee,
         string corridor,
         uint256 timestamp
     );
 
     event ValidatorAdded(address indexed validator, string organization);
     event ValidatorRemoved(address indexed validator);
+    event TreasuryUpdated(address indexed oldTreasury, address indexed newTreasury);
+    event FeeUpdated(uint256 oldFee, uint256 newFee);
 
     /**
      * @notice Initialize the Pasifika Token
@@ -59,9 +66,9 @@ contract PasifikaToken is ERC20, ERC20Burnable, ERC20Pausable, AccessControl {
     }
 
     /**
-     * @notice Send a remittance with corridor tracking
+     * @notice Send a remittance with corridor tracking (fee applied)
      * @param to Recipient address
-     * @param amount Amount of tokens to send
+     * @param amount Amount of tokens to send (before fee)
      * @param corridor Remittance corridor (e.g., "US-TONGA", "NZ-SAMOA")
      */
     function sendRemittance(
@@ -72,9 +79,48 @@ contract PasifikaToken is ERC20, ERC20Burnable, ERC20Pausable, AccessControl {
         require(to != address(0), "Cannot send to zero address");
         require(amount > 0, "Amount must be greater than zero");
         
-        _transfer(msg.sender, to, amount);
+        uint256 fee = calculateFee(amount);
+        uint256 netAmount = amount - fee;
         
-        emit RemittanceSent(msg.sender, to, amount, corridor, block.timestamp);
+        if (fee > 0 && treasury != address(0)) {
+            _transfer(msg.sender, treasury, fee);
+        }
+        _transfer(msg.sender, to, netAmount);
+        
+        emit RemittanceSent(msg.sender, to, netAmount, fee, corridor, block.timestamp);
+    }
+
+    /**
+     * @notice Calculate fee for a given amount
+     * @param amount Amount to calculate fee for
+     * @return fee The calculated fee
+     */
+    function calculateFee(uint256 amount) public view returns (uint256) {
+        if (treasury == address(0) || feeBasisPoints == 0) {
+            return 0;
+        }
+        return (amount * feeBasisPoints) / 10000;
+    }
+
+    /**
+     * @notice Set the treasury address
+     * @param newTreasury New treasury address
+     */
+    function setTreasury(address newTreasury) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        address oldTreasury = treasury;
+        treasury = newTreasury;
+        emit TreasuryUpdated(oldTreasury, newTreasury);
+    }
+
+    /**
+     * @notice Set the fee in basis points (100 = 1%)
+     * @param newFeeBasisPoints New fee in basis points
+     */
+    function setFeeBasisPoints(uint256 newFeeBasisPoints) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(newFeeBasisPoints <= MAX_FEE_BASIS_POINTS, "Fee too high");
+        uint256 oldFee = feeBasisPoints;
+        feeBasisPoints = newFeeBasisPoints;
+        emit FeeUpdated(oldFee, newFeeBasisPoints);
     }
 
     /**

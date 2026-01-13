@@ -3,14 +3,14 @@
 **ERC-20 Token for Pacific Islander Remittances**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Solidity](https://img.shields.io/badge/Solidity-0.8.20-blue)](https://docs.soliditylang.org/)
+[![Solidity](https://img.shields.io/badge/Solidity-0.8.24-blue)](https://docs.soliditylang.org/)
 [![Foundry](https://img.shields.io/badge/Built%20with-Foundry-FFDB1C)](https://getfoundry.sh/)
 
 ## Overview
 
 Pasifika Token (PASI) is an ERC-20 token designed specifically for Pacific Islander communities and their diaspora. Built for deployment on the **Pasifika Data Chain** (Chain ID: 999888), it enables:
 
-- **Low-cost remittances** - Near zero transaction fees on Pasifika PoA Chain
+- **Low-cost remittances** - Only 0.5% fee vs 5-15% traditional services
 - **Community governance** - Role based access control with validator organizations
 - **Financial inclusion** - Simple token transfers without traditional banking barriers
 - **Global cross-border portability** - Works across US, New Zealand, Australia, Pacific Islands, EU, Russia, Asia, Africa, Arctic, Antarctica, and Middle East
@@ -26,6 +26,7 @@ Pasifika Token (PASI) is an ERC-20 token designed specifically for Pacific Islan
 | **Initial Supply** | 100,000,000 (100 million) |
 | **Standard** | ERC-20 |
 | **Network** | Pasifika Data Chain (999888) |
+| **Remittance Fee** | 0.5% (configurable, max 5%) |
 
 ## Features
 
@@ -34,11 +35,25 @@ Pasifika Token (PASI) is an ERC-20 token designed specifically for Pacific Islan
 - **Remittance tracking** with corridor identification (e.g., "US-TONGA", "NZ-SAMOA")
 - **Batch transfers** for community distributions (up to 100 recipients)
 - **Burnable** tokens for supply management
+- **Fee collection** - 0.5% fee on remittances sent to Treasury
 
-### Governance
+### Treasury & Governance
+- **PasifikaTreasury contract** - Collects fees from remittances
+- **Validator voting** - Validators propose and vote on fee distributions
 - **Role based access control** using OpenZeppelin AccessControl
 - **Validator management** - Add/remove trusted community organizations
 - **Pausable** - Emergency stop functionality for security
+
+## Cost Comparison
+
+| Service | Fee | $500 Transfer Cost | Speed |
+|---------|-----|-------------------|-------|
+| Western Union | 5-10% | $25-50 | 1-3 days |
+| MoneyGram | 5-8% | $25-40 | 1-3 days |
+| Bank Wire | 3-5% | $15-25 | 3-5 days |
+| **Pasifika Token** | **0.5%** | **$2.50** | **< 5 min** |
+
+**Annual savings**: A family sending $500/month saves **$330-450/year** compared to traditional services.
 
 ### Roles
 | Role | Description |
@@ -100,12 +115,21 @@ forge test --gas-report
 
 The Pasifika Data Chain is live at **https://rpc.pasifika.xyz**
 
+**1. Create a keystore for your deployer wallet:**
 ```bash
-# Deploy using your private key
-PRIVATE_KEY=0x... forge script script/Deploy.s.sol --rpc-url https://rpc.pasifika.xyz --broadcast
+cast wallet import pasifika-deployer --interactive
+```
+You will be prompted to enter your private key and a password to encrypt it.
 
-# Or use the configured RPC alias
-PRIVATE_KEY=0x... forge script script/Deploy.s.sol --rpc-url pasifika --broadcast
+**2. Deploy the token:**
+```bash
+forge script script/Deploy.s.sol --rpc-url https://rpc.pasifika.xyz --account pasifika-deployer --broadcast
+```
+You will be prompted for your keystore password.
+
+**3. (Optional) List your keystores:**
+```bash
+cast wallet list
 ```
 
 ### Interact with Deployed Token
@@ -114,11 +138,11 @@ PRIVATE_KEY=0x... forge script script/Deploy.s.sol --rpc-url pasifika --broadcas
 # Check balance
 cast call <TOKEN_ADDRESS> "balanceOf(address)" <WALLET_ADDRESS> --rpc-url https://rpc.pasifika.xyz
 
-# Transfer tokens
-cast send <TOKEN_ADDRESS> "transfer(address,uint256)" <TO_ADDRESS> <AMOUNT> --private-key <PRIVATE_KEY> --rpc-url https://rpc.pasifika.xyz
+# Transfer tokens (using keystore)
+cast send <TOKEN_ADDRESS> "transfer(address,uint256)" <TO_ADDRESS> <AMOUNT> --account pasifika-deployer --rpc-url https://rpc.pasifika.xyz
 
-# Send remittance with corridor tracking
-cast send <TOKEN_ADDRESS> "sendRemittance(address,uint256,string)" <TO_ADDRESS> <AMOUNT> "US-TONGA" --private-key <PRIVATE_KEY> --rpc-url https://rpc.pasifika.xyz
+# Send remittance with corridor tracking (using keystore)
+cast send <TOKEN_ADDRESS> "sendRemittance(address,uint256,string)" <TO_ADDRESS> <AMOUNT> "US-TONGA" --account pasifika-deployer --rpc-url https://rpc.pasifika.xyz
 ```
 
 ## Contract API
@@ -161,6 +185,19 @@ function pause() external;
 function unpause() external;
 ```
 
+### Fee Functions
+
+```solidity
+// Calculate fee for an amount
+function calculateFee(uint256 amount) external view returns (uint256);
+
+// Set treasury address (ADMIN only)
+function setTreasury(address newTreasury) external;
+
+// Set fee in basis points, 50 = 0.5% (ADMIN only)
+function setFeeBasisPoints(uint256 newFeeBasisPoints) external;
+```
+
 ### Events
 
 ```solidity
@@ -168,13 +205,46 @@ event RemittanceSent(
     address indexed from,
     address indexed to,
     uint256 amount,
+    uint256 fee,
     string corridor,
     uint256 timestamp
 );
 
 event ValidatorAdded(address indexed validator, string organization);
 event ValidatorRemoved(address indexed validator);
+event TreasuryUpdated(address indexed oldTreasury, address indexed newTreasury);
+event FeeUpdated(uint256 oldFee, uint256 newFee);
 ```
+
+## Treasury Contract
+
+The `PasifikaTreasury` contract collects fees and enables validator governance for distributions.
+
+### Treasury Functions
+
+```solidity
+// Propose a distribution (VALIDATOR only)
+function proposeDistribution(address recipient, uint256 amount, string calldata description) external returns (uint256 proposalId);
+
+// Vote on a proposal (VALIDATOR only)
+function vote(uint256 proposalId, bool support) external;
+
+// Execute approved distribution (anyone can call after voting period)
+function executeDistribution(uint256 proposalId) external;
+
+// View treasury balance
+function treasuryBalance() external view returns (uint256);
+
+// Get proposal details
+function getProposal(uint256 proposalId) external view returns (...);
+```
+
+### Governance Parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `votingPeriod` | 3 days | Time for validators to vote |
+| `quorumPercent` | 51% | Required validator participation |
 
 ## Remittance Corridors
 
@@ -253,11 +323,12 @@ Supported corridor codes for tracking (examples):
 ```
 pasifika-token/
 ├── src/
-│   └── PasifikaToken.sol      # Main token contract
+│   ├── PasifikaToken.sol      # Main token contract
+│   └── PasifikaTreasury.sol   # Treasury & governance contract
 ├── script/
 │   └── Deploy.s.sol           # Deployment scripts
 ├── test/
-│   └── PasifikaToken.t.sol    # Unit tests
+│   └── PasifikaToken.t.sol    # Unit tests (35 tests)
 ├── lib/                        # Dependencies (forge-std, openzeppelin)
 ├── foundry.toml               # Foundry configuration
 ├── remappings.txt             # Import remappings
@@ -266,10 +337,20 @@ pasifika-token/
 
 ### Adding a New Feature
 
-1. Implement in `src/PasifikaToken.sol`
+1. Implement in `src/PasifikaToken.sol` or `src/PasifikaTreasury.sol`
 2. Add tests in `test/PasifikaToken.t.sol`
 3. Run `forge test` to verify
 4. Update deployment script if needed
+
+### Test Coverage
+
+```bash
+# Run all 35 tests
+forge test
+
+# With gas report
+forge test --gas-report
+```
 
 ## License
 
