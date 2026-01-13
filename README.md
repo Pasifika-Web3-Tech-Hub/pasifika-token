@@ -10,10 +10,10 @@
 
 Pasifika Token (PASI) is an ERC-20 token designed specifically for Pacific Islander communities and their diaspora. Built for deployment on the **Pasifika Data Chain** (Chain ID: 999888), it enables:
 
-- **Low-cost remittances** - Only 0.5% fee vs 5-15% traditional services
+- **Low cost remittances** - Only 0.5% fee vs 5-15% traditional services
 - **Community governance** - Role based access control with validator organizations
 - **Financial inclusion** - Simple token transfers without traditional banking barriers
-- **Global cross-border portability** - Works across US, New Zealand, Australia, Pacific Islands, EU, Russia, Asia, Africa, Arctic, Antarctica, and Middle East
+- **Global cross border portability** - Works across US, New Zealand, Australia, Pacific Islands, EU, Russia, Asia, Africa, Arctic, Antarctica, and Middle East
 
 ## Token Specifications
 
@@ -379,7 +379,7 @@ MIT License - see [LICENSE](LICENSE)
 ## Links
 
 - **Pasifika Data Chain**: [pasifika-poa-chain](../pasifika-poa-chain/)
-- **PoC Documentation**: [pasifika_token_poc.md](./pasifika_token_poc.md)
+- **Whitepaper**: [WHITEPAPER.md](./docs/WHITEPAPER.md)
 - **Website**: https://pasifika.xyz
 - **Contact**: edwin@pasifika.xyz
 

@@ -21,14 +21,22 @@ contract DeployPasifikaToken is Script {
     uint256 constant INITIAL_SUPPLY = 100_000_000 * 10 ** 18;
 
     function run() external {
-        // Get deployer address from the keystore account
-        address deployer = msg.sender;
+        // Get the deployer address from the private key used for broadcast
+        uint256 deployerPrivateKey = vm.envOr("PRIVATE_KEY", uint256(0));
+        address deployer;
+        
+        if (deployerPrivateKey != 0) {
+            deployer = vm.addr(deployerPrivateKey);
+            vm.startBroadcast(deployerPrivateKey);
+        } else {
+            // When using --account flag, use tx.origin as deployer
+            deployer = tx.origin;
+            vm.startBroadcast();
+        }
         
         console.log("=== Deploying Pasifika Token System ===");
         console.log("Deployer:", deployer);
         console.log("Initial Supply:", INITIAL_SUPPLY / 10 ** 18, "PASI");
-
-        vm.startBroadcast();
 
         // 1. Deploy Token
         PasifikaToken token = new PasifikaToken(deployer, INITIAL_SUPPLY);

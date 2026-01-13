@@ -15,5 +15,6 @@ bracket_spacing = true
 pasifika = "https://rpc.pasifika.xyz"
 localhost = "http://127.0.0.1:8545"
 
-[etherscan]
-pasifika = { key = "", chain = 999888 }
+# Etherscan verification not available for Pasifika Data Chain
+# [etherscan]
+# pasifika = { key = "", chain = 999888 }
