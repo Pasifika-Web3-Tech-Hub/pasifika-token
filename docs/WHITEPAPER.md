@@ -1,7 +1,7 @@
 # Pasifika Token (PASI) Whitepaper
 
 <p align="center">
-<img src="https://pasifika.xyz/logo.png" alt="Pasifika Token" width="200">
+<img src="../PASI.png" alt="Pasifika Token logo" width="220">
 </p>
 
 <p align="center">

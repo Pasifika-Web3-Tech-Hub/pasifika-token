@@ -1,5 +1,9 @@
 # Pasifika Token (PASI)
 
+<p align="center">
+  <img src="./PASI.png" alt="Pasifika Token logo" width="220">
+</p>
+
 **ERC-20 Token for Pacific Islander Remittances**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
